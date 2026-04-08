@@ -16,48 +16,50 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
+        systemInstruction: {
+          role: "system",
+          parts: [
+            {
+              text: `You extract structured interview data from raw dumps.
+Return ONLY valid JSON that matches the schema.
+If content is spam, a test, or irrelevant to interview experiences, return rejected=true and a reason.
+For category: use "Software" for CS/IT/software roles, "Core ECE" for electronics/hardware/VLSI/embedded roles, and "Management" for HR/finance/consulting/management roles.`,
+            },
+          ],
+        },
+        contents: [
           {
-            role: "system",
-            content: `You extract structured interview data from raw dumps. Return a JSON object via the tool provided.
-If the content is spam, a test, or irrelevant to interviews, call the tool with rejected=true.
-For category: use "Software" for CS/IT/software roles, "Core ECE" for electronics/hardware/VLSI/embedded roles, "Management" for HR/finance/consulting/management roles.`,
+            role: "user",
+            parts: [{ text: dump }],
           },
-          { role: "user", content: dump },
         ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_interview",
-              description: "Extract interview data or reject spam",
-              parameters: {
-                type: "object",
-                properties: {
-                  rejected: { type: "boolean", description: "True if content is spam/irrelevant" },
-                  reason: { type: "string", description: "Rejection reason if rejected" },
-                  company_name: { type: "string" },
-                  role: { type: "string" },
-                  category: { type: "string", enum: ["Software", "Core ECE", "Management"] },
-                  questions: { type: "array", items: { type: "string" }, description: "List of interview questions extracted" },
-                },
-                required: ["rejected"],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              rejected: { type: "BOOLEAN" },
+              reason: { type: "STRING" },
+              company_name: { type: "STRING" },
+              role: { type: "STRING" },
+              category: { type: "STRING", enum: ["Software", "Core ECE", "Management"] },
+              questions: {
+                type: "ARRAY",
+                items: { type: "STRING" },
               },
             },
+            required: ["rejected"],
           },
-        ],
-        tool_choice: { type: "function", function: { name: "extract_interview" } },
+        },
       }),
     });
 
@@ -78,10 +80,10 @@ For category: use "Software" for CS/IT/software roles, "Core ECE" for electronic
     }
 
     const result = await response.json();
-    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No tool call in AI response");
+    const modelText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!modelText) throw new Error("No JSON content in Gemini response");
 
-    const extracted = JSON.parse(toolCall.function.arguments);
+    const extracted = JSON.parse(modelText);
     return new Response(JSON.stringify(extracted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

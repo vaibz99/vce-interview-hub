@@ -6,6 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 
+type ExtractionResult = {
+  rejected: boolean;
+  reason?: string;
+  company_name?: string;
+  role?: string;
+  category?: "Software" | "Core ECE" | "Management";
+  questions?: string[];
+};
+
 export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onOpenChange: (v: boolean) => void; onPosted: () => void }) {
   const [dump, setDump] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,16 +27,22 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
 
     setLoading(true);
     try {
-      // Call AI extraction edge function
-      const { data: aiData, error: aiError } = await supabase.functions.invoke("extract-interview", {
+      const { data: aiData, error: aiError } = await supabase.functions.invoke<ExtractionResult>("extract-interview", {
         body: { dump: dump.trim() },
       });
 
-      if (aiError) throw new Error(aiError.message || "AI extraction failed");
+      if (aiError) {
+        throw new Error(aiError.message || "AI extraction failed");
+      }
+
       if (aiData?.rejected) {
         toast.error(aiData.reason || "Content was rejected as spam or irrelevant");
         setLoading(false);
         return;
+      }
+
+      if (!aiData.company_name || !aiData.role || !aiData.category || !Array.isArray(aiData.questions)) {
+        throw new Error("AI response missing required interview fields");
       }
 
       const { data: { user } } = await supabase.auth.getUser();

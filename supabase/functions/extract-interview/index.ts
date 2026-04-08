@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -16,7 +16,8 @@ serve(async (req) => {
       });
     }
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const GEMINI_API_KEY =
+      Deno.env.get("GEMINI_API_KEY") ?? (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -76,7 +77,7 @@ For category: use "Software" for CS/IT/software roles, "Core ECE" for electronic
       }
       const t = await response.text();
       console.error("AI error:", response.status, t);
-      throw new Error("AI extraction failed");
+      throw new Error(`AI extraction failed: ${response.status} ${t}`);
     }
 
     const result = await response.json();

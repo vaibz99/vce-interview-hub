@@ -12,6 +12,8 @@ export function AuthModal({ open, onOpenChange }: { open: boolean; onOpenChange:
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
+  const isOtpLengthValid = (value: string) => value.length >= 6 && value.length <= 8;
+
   const handleSend = async () => {
     if (!email.endsWith("@vce.ac.in")) {
       toast.error("Only @vce.ac.in emails are allowed");
@@ -32,8 +34,8 @@ export function AuthModal({ open, onOpenChange }: { open: boolean; onOpenChange:
   };
 
   const handleVerify = async () => {
-    if (!/^\d{6}$/.test(otp)) {
-      toast.error("Enter the 6-digit code sent to your email");
+    if (!/^\d{6,8}$/.test(otp)) {
+      toast.error("Enter the verification code sent to your email");
       return;
     }
 
@@ -79,14 +81,41 @@ export function AuthModal({ open, onOpenChange }: { open: boolean; onOpenChange:
             <p className="text-foreground font-medium">Enter your OTP code</p>
             <p className="text-sm text-muted-foreground">We sent a 6-digit code to <strong>{email}</strong>.</p>
             <Input
-              placeholder="123456"
+              placeholder="Enter verification code"
               value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 8);
+                if (isOtpLengthValid(pasted) && !loading) {
+                  e.preventDefault();
+                  setOtp(pasted);
+                  queueMicrotask(async () => {
+                    setLoading(true);
+                    const { error } = await supabase.auth.verifyOtp({
+                      email,
+                      token: pasted,
+                      type: "email",
+                    });
+                    setLoading(false);
+
+                    if (error) {
+                      toast.error(error.message);
+                      return;
+                    }
+
+                    toast.success("Signed in successfully");
+                    setEmail("");
+                    setOtp("");
+                    setSent(false);
+                    onOpenChange(false);
+                  });
+                }
+              }}
               className="bg-secondary border-border text-center tracking-[0.35em]"
               inputMode="numeric"
-              maxLength={6}
+              maxLength={8}
             />
-            <Button onClick={handleVerify} disabled={loading || otp.length !== 6} className="w-full">
+            <Button onClick={handleVerify} disabled={loading || !isOtpLengthValid(otp)} className="w-full">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowRight className="h-4 w-4" /> Verify Code</>}
             </Button>
             <Button

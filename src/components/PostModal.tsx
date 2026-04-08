@@ -15,6 +15,40 @@ type ExtractionResult = {
   questions?: string[];
 };
 
+const getFunctionErrorMessage = async (error: unknown): Promise<string> => {
+  const base = error && typeof error === "object" && "message" in error
+    ? String((error as { message: unknown }).message)
+    : "AI extraction failed";
+
+  if (!error || typeof error !== "object" || !("context" in error)) {
+    return base;
+  }
+
+  try {
+    const context = (error as { context?: { json?: () => Promise<unknown>; text?: () => Promise<string>; status?: number } }).context;
+    if (!context) return base;
+
+    const status = typeof context.status === "number" ? ` [${context.status}]` : "";
+    if (typeof context.json === "function") {
+      const payload = await context.json();
+      if (payload && typeof payload === "object" && "reason" in payload) {
+        const reason = String((payload as { reason: unknown }).reason);
+        return `${base}${status}: ${reason}`;
+      }
+      return `${base}${status}`;
+    }
+
+    if (typeof context.text === "function") {
+      const text = await context.text();
+      return `${base}${status}: ${text}`;
+    }
+
+    return `${base}${status}`;
+  } catch {
+    return base;
+  }
+};
+
 export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onOpenChange: (v: boolean) => void; onPosted: () => void }) {
   const [dump, setDump] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +66,7 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
       });
 
       if (aiError) {
-        throw new Error(aiError.message || "AI extraction failed");
+        throw new Error(await getFunctionErrorMessage(aiError));
       }
 
       if (aiData?.rejected) {

@@ -20,6 +20,10 @@ const getFunctionErrorMessage = async (error: unknown): Promise<string> => {
     ? String((error as { message: unknown }).message)
     : "AI extraction failed";
 
+  if (base.includes("[401]") || /\b401\b/.test(base)) {
+    return "Your session expired. Please sign in again and retry.";
+  }
+
   if (!error || typeof error !== "object" || !("context" in error)) {
     return base;
   }
@@ -29,6 +33,9 @@ const getFunctionErrorMessage = async (error: unknown): Promise<string> => {
     if (!context) return base;
 
     const status = typeof context.status === "number" ? ` [${context.status}]` : "";
+      if (status === " [401]") {
+        return "Your session expired. Please sign in again and retry.";
+      }
     if (typeof context.json === "function") {
       const payload = await context.json();
       if (payload && typeof payload === "object" && "reason" in payload) {
@@ -61,6 +68,11 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
 
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Your session expired. Please sign in again.");
+      }
+
       const { data: aiData, error: aiError } = await supabase.functions.invoke<ExtractionResult>("extract-interview", {
         body: { dump: dump.trim() },
       });
@@ -78,9 +90,6 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
       if (!aiData.company_name || !aiData.role || !aiData.category || !Array.isArray(aiData.questions)) {
         throw new Error("AI response missing required interview fields");
       }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
 
       const { error: insertError } = await supabase.from("interviews").insert({
         user_id: user.id,

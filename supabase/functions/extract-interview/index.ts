@@ -34,10 +34,20 @@ serve(async (req) => {
             {
               text: `You extract structured interview data from raw dumps.
 Return ONLY valid JSON that matches the schema.
-IMPORTANT: Extract ALL questions mentioned, including round numbers and context. Do not truncate.
-Format questions as: "Round X - Question text" to preserve structure.
-If content is spam, a test, or irrelevant to interview experiences, return rejected=true and a reason.
-For category: use "Software" for CS/IT/software roles, "Core ECE" for electronics/hardware/VLSI/embedded roles, and "Management" for HR/finance/consulting/management roles.`,
+
+CRITICAL INSTRUCTIONS FOR QUESTIONS FIELD:
+- Extract ALL questions from the dump, preserving round structure
+- Format EACH question as: "Round X - Question text" (e.g., "Round 1 - Tell me about yourself")
+- If round information is not explicit, infer from context (e.g., first group = Round 1, second = Round 2)
+- Include round number for EVERY question, even if grouped under different headings
+- Do NOT truncate or summarize questions - include full text
+- Include both technical AND behavioral questions
+
+Example format:
+["Round 1 - Tell me about yourself", "Round 1 - Why Deloitte?", "Round 2 - Implement a function to reverse a string", "Round 3 - Tell me about a time you worked in a team"]
+
+If content is spam, irrelevant, or not an interview, return rejected=true with reason.
+For category: use "Software" for CS/IT/software roles, "Core ECE" for electronics/hardware/VLSI/embedded roles, "Management" for HR/finance/consulting/management roles.`,
             },
           ],
         },

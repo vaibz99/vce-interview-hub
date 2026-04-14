@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Share2, Building2, Briefcase, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 interface Interview {
   id: string;
@@ -20,6 +21,8 @@ const categoryColors: Record<string, string> = {
 };
 
 export function InterviewCard({ interview }: { interview: Interview }) {
+  const navigate = useNavigate();
+
   const shareToWhatsApp = () => {
     const url = `${window.location.origin}/interview/${interview.id}`;
     const text = `Check out this ${interview.company_name} (${interview.role}) interview dump on VCE ECE Placement Dump!\n${url}`;
@@ -27,7 +30,7 @@ export function InterviewCard({ interview }: { interview: Interview }) {
   };
 
   return (
-    <Card className="glass-card hover:border-primary/30 transition-all duration-300 group">
+    <Card className="glass-card hover:border-primary/30 transition-all duration-300 group cursor-pointer" onClick={() => navigate(`/interview/${interview.id}`)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -49,24 +52,24 @@ export function InterviewCard({ interview }: { interview: Interview }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <ul className="space-y-2">
-          {(interview.questions as string[]).slice(0, 5).map((q, i) => (
+          {(interview.questions as string[]).map((q, i) => (
             <li key={i} className="text-sm text-muted-foreground flex gap-2">
               <span className="text-primary font-mono text-xs mt-0.5">{String(i + 1).padStart(2, "0")}</span>
               <span>{q}</span>
             </li>
           ))}
-          {(interview.questions as string[]).length > 5 && (
-            <li className="text-xs text-muted-foreground/60 pl-6">
-              +{(interview.questions as string[]).length - 5} more questions
-            </li>
-          )}
         </ul>
         <div className="flex items-center justify-between pt-2 border-t border-border/50">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Calendar className="h-3 w-3" />
             {format(new Date(interview.created_at), "MMM d, yyyy")}
           </div>
-          <Button variant="ghost" size="sm" onClick={shareToWhatsApp} className="text-muted-foreground hover:text-primary">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={(e) => { e.stopPropagation(); shareToWhatsApp(); }} 
+            className="text-muted-foreground hover:text-primary"
+          >
             <Share2 className="h-4 w-4" />
             Share
           </Button>

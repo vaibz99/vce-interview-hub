@@ -51,14 +51,40 @@ export function InterviewCard({ interview }: { interview: Interview }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ul className="space-y-2">
-          {(interview.questions as string[]).map((q, i) => (
-            <li key={i} className="text-sm text-muted-foreground flex gap-2">
-              <span className="text-primary font-mono text-xs mt-0.5">{String(i + 1).padStart(2, "0")}</span>
-              <span>{q}</span>
-            </li>
-          ))}
-        </ul>
+        {(() => {
+          // Group questions by round
+          const questionsByRound: Record<string, string[]> = {};
+          
+          (interview.questions as string[]).forEach((q) => {
+            const roundMatch = q.match(/^Round\s+(\d+)\s*-\s*(.+)$/i);
+            if (roundMatch) {
+              const roundNum = `Round ${roundMatch[1]}`;
+              const question = roundMatch[2];
+              if (!questionsByRound[roundNum]) questionsByRound[roundNum] = [];
+              questionsByRound[roundNum].push(question);
+            } else {
+              // If no round prefix, treat as ungrouped
+              if (!questionsByRound["Questions"]) questionsByRound["Questions"] = [];
+              questionsByRound["Questions"].push(q);
+            }
+          });
+          
+          return Object.entries(questionsByRound).map(([round, questions]) => (
+            <div key={round} className="space-y-2">
+              <h4 className="text-sm font-semibold text-primary">{round}</h4>
+              <ul className="space-y-1 pl-2 border-l-2 border-primary/30">
+                {questions.map((q, idx) => (
+                  <li key={idx} className="text-sm text-muted-foreground flex gap-2">
+                    <span className="text-primary/60 font-mono text-xs mt-0.5">
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <span>{q}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ));
+        })()}
         <div className="flex items-center justify-between pt-2 border-t border-border/50">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Calendar className="h-3 w-3" />

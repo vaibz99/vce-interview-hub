@@ -60,7 +60,7 @@ For category: use "Software" for CS/IT/software roles, "Core ECE" for electronic
                 items: { type: "STRING" },
               },
             },
-            required: ["rejected"],
+            required: ["rejected", "company_name", "role", "category", "questions"],
           },
         },
       }),

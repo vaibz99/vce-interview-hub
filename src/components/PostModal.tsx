@@ -33,9 +33,10 @@ const getFunctionErrorMessage = async (error: unknown): Promise<string> => {
     if (!context) return base;
 
     const status = typeof context.status === "number" ? ` [${context.status}]` : "";
-      if (status === " [401]") {
-        return "Your session expired. Please sign in again and retry.";
-      }
+    if (status === " [401]") {
+      return "Your session expired. Please sign in again and retry.";
+    }
+    
     if (typeof context.json === "function") {
       const payload = await context.json();
       if (payload && typeof payload === "object" && "reason" in payload) {
@@ -68,14 +69,20 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
 
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("Your session expired. Please sign in again.");
+      // 1. Check if user is authenticated
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error("Not authenticated. Please sign in first.");
       }
 
+      console.log("User authenticated:", user.id);
+
+      // 2. Call AI extraction function
       const { data: aiData, error: aiError } = await supabase.functions.invoke<ExtractionResult>("extract-interview", {
         body: { dump: dump.trim() },
       });
+
+      console.log("AI Response:", aiData, aiError);
 
       if (aiError) {
         throw new Error(await getFunctionErrorMessage(aiError));
@@ -87,10 +94,11 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
         return;
       }
 
-      if (!aiData.company_name || !aiData.role || !aiData.category || !Array.isArray(aiData.questions)) {
+      if (!aiData?.company_name || !aiData?.role || !aiData?.category || !Array.isArray(aiData?.questions)) {
         throw new Error("AI response missing required interview fields");
       }
 
+      // 3. Insert into the database
       const { error: insertError } = await supabase.from("interviews").insert({
         user_id: user.id,
         company_name: aiData.company_name,
@@ -102,11 +110,13 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
 
       if (insertError) throw insertError;
 
+      console.log("Interview posted successfully");
       toast.success("Interview dump posted successfully!");
       setDump("");
       onOpenChange(false);
       onPosted();
     } catch (err: any) {
+      console.error("Error in PostModal:", err);
       toast.error(err.message || "Failed to post");
     } finally {
       setLoading(false);
@@ -136,7 +146,11 @@ export function PostModal({ open, onOpenChange, onPosted }: { open: boolean; onO
             Your identity stays anonymous on the public feed
           </div>
           <Button onClick={handleSubmit} disabled={loading || dump.trim().length < 20} className="w-full">
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Extracting & Posting...</> : <><Sparkles className="h-4 w-4" /> Extract & Post</>}
+            {loading ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Extracting & Posting...</>
+            ) : (
+              <><Sparkles className="h-4 w-4" /> Extract & Post</>
+            )}
           </Button>
         </div>
       </DialogContent>
